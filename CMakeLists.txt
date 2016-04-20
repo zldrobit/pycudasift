@@ -11,7 +11,13 @@ set(CPACK_PACKAGE_VERSION_PATCH "${cudaSift_VERSION_PATCH}")
 set(CPACK_GENERATOR "ZIP")
 include(CPack)
 
-find_package(OpenCV REQUIRED)
+option(CUDASIFT_WITH_OPENCV "CUDASIFT_WITH_OPENCV" ON)
+option(CUDASIFT_WITH_LIB "CUDASIFT_WITH_LIB" ON)
+
+find_package(OpenCV)
+if (NOT OpenCV)
+    set(CUDASIFT_WITH_OPENCV OFF)
+endif()
 find_package(CUDA)
 if (NOT CUDA_FOUND)
   message(STATUS "CUDA not found. Project will not be built.")
@@ -19,14 +25,14 @@ endif(NOT CUDA_FOUND)
 
 if (WIN32)
   set(EXTRA_CXX_FLAGS "/DVERBOSE /D_CRT_SECURE_NO_WARNINGS ")
-  list(APPEND CUDA_NVCC_FLAGS "-arch=sm_35;--compiler-options;-O2;-DVERBOSE") 
+  list(APPEND CUDA_NVCC_FLAGS "--compiler-options;-O2;-DVERBOSE") 
 endif()
 if (UNIX)
   if (APPLE)
     set(EXTRA_CXX_FLAGS "-DVERBOSE -msse2")
-    list(APPEND CUDA_NVCC_FLAGS "-arch=sm_35;--compiler-options;-O2;-DVERBOSE") 
+    list(APPEND CUDA_NVCC_FLAGS "--compiler-options;-O2;-DVERBOSE") 
   else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -msse2 ")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -msse2 -fPIC")
     list(APPEND CUDA_NVCC_FLAGS "-lineinfo;--compiler-options;-O2;-DVERBOSE") 
   endif()
 endif()
@@ -41,7 +47,12 @@ set(cuda_sources
   cudaSiftD.h  
   cudaSift.h  
   cudautils.h
-)  
+)
+set(cuda_sources_absolute "")
+foreach(f ${cuda_sources})
+  get_filename_component(a ${f} ABSOLUTE)
+  list(APPEND cuda_sources_absolute ${a})
+endforeach(f)
 
 set(sources
   geomFuncs.cpp  
@@ -54,22 +65,25 @@ include_directories(
 
 SET(CUDA_SEPARABLE_COMPILATION ON)
 
-cuda_add_executable(cudasift ${cuda_sources} ${sources} OPTIONS -arch=sm_35)
+if (CUDASIFT_WITH_OPENCV)
+  cuda_add_executable(cudasift ${cuda_sources} ${sources})
+  set_target_properties(cudasift PROPERTIES
+    COMPILE_FLAGS "${EXTRA_CXX_FLAGS}"			   
+  )
 
-set_target_properties(cudasift PROPERTIES
-  COMPILE_FLAGS "${EXTRA_CXX_FLAGS}"			   
-)
-
-target_link_libraries(cudasift
-  /usr/local/cuda/lib64/libcudadevrt.a ${OpenCV_LIBS} 
-)
+  target_link_libraries(cudasift
+    /usr/local/cuda/lib64/libcudadevrt.a ${OpenCV_LIBS} 
+  )
  
+endif()
+
+add_subdirectory(lib)
+
 install(FILES 
   ${cuda_sources} 
   ${sources}
   cudaSiftD.cu
   CMakeLists.txt
-  Copyright.txt
   DESTINATION .
 )
 install(FILES data/left.pgm data/righ.pgm
