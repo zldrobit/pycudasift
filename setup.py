@@ -56,10 +56,9 @@ class BuildExt(build_ext):
             extension.extra_compile_args = ["-g", "--verbose"]
             if extension.extra_link_args is None:
                 extension.extra_link_args = []
-            if extension.name.find("encode") >= 0:
-                extension.extra_link_args += [
-                    "-L%s" % os.path.join(self.cuda_prefix, "lib64"),
-                    "-lcudart"]
+            extension.extra_link_args += [
+                "-L%s" % os.path.join(self.cuda_prefix, "lib64"),
+                "-lcudart"]
         build_ext.build_extensions(self)
     
     def _cuda_compile(self, obj, src, ext, cc_args, extra_postargs, pp_opts):

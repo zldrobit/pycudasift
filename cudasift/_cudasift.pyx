@@ -28,6 +28,10 @@ cdef extern from "cuda_runtime_api.h" nogil:
         int isManaged
     cdef cudaError_t cudaPointerGetAttributes(cudaPointerAttributes *attributes, void *ptr) nogil
     cdef cudaError_t cudaMemcpy(void *dst, const void *src, size_t count, int kind)
+    cdef cudaError_t cudaHostRegister(void *ptr, size_t size, unsigned int flags)
+    cdef cudaError_t cudaHostUnregister(void *ptr)
+    cdef cudaError_t cudaMallocHost(void *ptr, size_t size)
+    cdef cudaError_t cudaFreeHost(void *ptr)
 
 cdef extern from "cudaImage.h" nogil:
     cdef cppclass CudaImage:
@@ -94,6 +98,10 @@ def PyInitCuda(devNum=0):
     
 PyInitCuda()
 
+def checkError(error, msg):
+    if error != 0:
+        raise RuntimeError("Cuda error %d: %s" % (error, msg))
+        
 cdef class PySiftData:
     '''A wrapper around CudaSift's SiftData'''
     cdef:
@@ -119,13 +127,26 @@ cdef class PySiftData:
         cdef:
             SiftData *data = &self.data
             SiftPoint *pts
+            void *dest
+            size_t data_size = data.numPts * sizeof(SiftPoint)
+            int error
+            int state
+            np.ndarray[np.float32_t, ndim=2, mode='c'] h_data
         nKeypoints = data.numPts;
         stride = sizeof(SiftPoint) / sizeof(float)
         dtype = np.dtype("f%d" % sizeof(float))
-        h_data = np.zeros((nKeypoints, stride), dtype)
+        h_data = np.ascontiguousarray(np.zeros((nKeypoints, stride), dtype))
         pts = <SiftPoint *>h_data.data
+        assert h_data.size * sizeof(float) == data_size, ("h_data.size = %d, data_size = %d" % (h_data.size, data_size))
         with nogil:
-            cudaMemcpy(pts, data.d_data, sizeof(SiftPoint)*data.numPts, cudaMemcpyDeviceToHost)
+            state = 0
+            error = cudaHostRegister(<void *>pts, data_size, 0)
+            if error == 0:
+                state = 1
+                error = cudaMemcpy(pts, data.d_data, data_size, 
+                                   cudaMemcpyDeviceToHost)
+                cudaHostUnregister(pts)
+        checkError(error, "during " + ("cudaHostRegister" if state == 0 else "cudaMemcpy"))
         xpos_off = <size_t>(&pts.xpos - <float *>pts)
         ypos_off = <size_t>(&pts.ypos - <float *>pts)
         scale_off = <size_t>(&pts.scale - <float *>pts)
@@ -218,9 +239,8 @@ def ExtractKeypoints(np.ndarray srcImage,
         void *pSrc = tmp.data
     with nogil:
         destImage.Allocate(size_x, size_y, iAlignUp(size_x, 128), 
-                         False, NULL, NULL)
-        cudaMemcpy(destImage.d_data, pSrc, sizeof(float) * size_x * size_y,
-                   cudaMemcpyHostToDevice)
+                         False, NULL, <float *>pSrc)
+        destImage.Download()
     del tmp
     with nogil:
         ExtractSift(pySiftData.data, destImage, numOctaves, initBlur, thresh,
