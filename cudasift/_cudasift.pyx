@@ -32,6 +32,7 @@ cdef extern from "cuda_runtime_api.h" nogil:
     cdef cudaError_t cudaHostUnregister(void *ptr)
     cdef cudaError_t cudaMallocHost(void *ptr, size_t size)
     cdef cudaError_t cudaFreeHost(void *ptr)
+    cdef cudaError_t cudaMemset(void *dst, int value, size_t count)
 
 cdef extern from "cudaImage.h" nogil:
     cdef cppclass CudaImage:
@@ -132,10 +133,21 @@ cdef class PySiftData:
             int error
             int state
             np.ndarray[np.float32_t, ndim=2, mode='c'] h_data
+            np.ndarray[np.int32_t, ndim=1, mode='c'] match_data
+            size_t idx
         nKeypoints = data.numPts;
+        if nKeypoints == 0:
+            empty = np.zeros(0, np.float32)
+            return pandas.DataFrame(dict(
+                xpos=empty, ypos=empty, scale=empty,
+                sharpness=empty, edgeness=empty, orientation=empty,
+                score=empty, ambiguity=empty, match=np.zeros(0, int),
+                match_xpos=empty, match_ypos=empty, match_error=empty,
+                subsampling=empty)), np.zeros((0, 128), np.float32)
         stride = sizeof(SiftPoint) / sizeof(float)
         dtype = np.dtype("f%d" % sizeof(float))
         h_data = np.ascontiguousarray(np.zeros((nKeypoints, stride), dtype))
+        match_data = np.ascontiguousarray(np.zeros(nKeypoints, np.int32))
         pts = <SiftPoint *>h_data.data
         assert h_data.size * sizeof(float) == data_size, ("h_data.size = %d, data_size = %d" % (h_data.size, data_size))
         with nogil:
@@ -147,6 +159,8 @@ cdef class PySiftData:
                                    cudaMemcpyDeviceToHost)
                 cudaHostUnregister(pts)
         checkError(error, "during " + ("cudaHostRegister" if state == 0 else "cudaMemcpy"))
+        for 0 <= idx < nKeypoints:
+            match_data[idx] = pts[idx].match
         xpos_off = <size_t>(&pts.xpos - <float *>pts)
         ypos_off = <size_t>(&pts.ypos - <float *>pts)
         scale_off = <size_t>(&pts.scale - <float *>pts)
@@ -155,15 +169,24 @@ cdef class PySiftData:
         orientation_off = <size_t>(&pts.orientation - <float *>pts)
         score_off = <size_t>(&pts.score - <float *>pts)
         ambiguity_off = <size_t>(&pts.ambiguity - <float *>pts)
+        match_xpos_off = <size_t>(&pts.match_xpos - <float *>pts)
+        match_ypos_off = <size_t>(&pts.match_ypos - <float *>pts)
+        match_error_off = <size_t>(&pts.match_error - <float *>pts)
+        subsampling_off = <size_t>(&pts.subsampling - <float *>pts)
         return pandas.concat((
             pandas.Series(h_data[:, xpos_off], name="xpos"),
             pandas.Series(h_data[:, ypos_off], name="ypos"),
-            pandas.Series(h_data[:, scale_off], name="stride"),
+            pandas.Series(h_data[:, scale_off], name="scale"),
             pandas.Series(h_data[:, sharpness_off], name="sharpness"),
             pandas.Series(h_data[:, edgeness_off], name="edgeness"),
             pandas.Series(h_data[:, orientation_off], name="orientation"),
             pandas.Series(h_data[:, score_off], name="score"),
-            pandas.Series(h_data[:, ambiguity_off], name="ambiguity")
+            pandas.Series(h_data[:, ambiguity_off], name="ambiguity"),
+            pandas.Series(match_data, name = "match"),
+            pandas.Series(h_data[:, match_xpos_off], name="match_xpos"),
+            pandas.Series(h_data[:, match_ypos_off], name="match_ypos"),
+            pandas.Series(h_data[:, match_error_off], name="match_error"),
+            pandas.Series(h_data[:, subsampling_off], name="subsampling")
             ), axis=1), h_data[:, -128:]
     
     @staticmethod
@@ -181,11 +204,15 @@ cdef class PySiftData:
             SiftData *data = &self.data
             SiftPoint *pts
             size_t size = len(data_frame)
+            int state
+            int error
+            size_t data_size
+            np.ndarray[np.float32_t, ndim=2, mode='c'] tmp
         
-        tmp = np.zeros(
+        tmp = np.ascontiguousarray(np.zeros(
             (size, sizeof(SiftPoint) / sizeof(float)),
-            dtype="f%d" % sizeof(float))
-        pts = <SiftPoint *>tmp.data           
+            dtype="f%d" % sizeof(float)))
+        pts = <SiftPoint *>tmp.data          
         xpos_off = <size_t>(&pts.xpos - <float *>pts)
         ypos_off = <size_t>(&pts.ypos - <float *>pts)
         scale_off = <size_t>(&pts.scale - <float *>pts)
@@ -194,18 +221,21 @@ cdef class PySiftData:
         orientation_off = <size_t>(&pts.orientation - <float *>pts)
         score_off = <size_t>(&pts.score - <float *>pts)
         ambiguity_off = <size_t>(&pts.ambiguity - <float *>pts)
-        tmp[:, xpos_off] = data_frame.xpos
-        tmp[:, ypos_off] = data_frame.ypos
-        tmp[:, scale_off] = data_frame.scale
-        tmp[:, sharpness_off] = data_frame.sharpness
-        tmp[:, edgeness_off] = data_frame.edgeness
-        tmp[:, orientation_off] = data_frame.orientation
-        tmp[:, score_off] = data_frame.score
-        tmp[:, ambiguity_off] = data_frame.ambiguity
+        tmp[:, xpos_off] = data_frame.xpos.as_matrix()
+        tmp[:, ypos_off] = data_frame.ypos.as_matrix()
+        tmp[:, scale_off] = data_frame.scale.as_matrix()
+        tmp[:, sharpness_off] = data_frame.sharpness.as_matrix()
+        tmp[:, edgeness_off] = data_frame.edgeness.as_matrix()
+        tmp[:, orientation_off] = data_frame.orientation.as_matrix()
+        tmp[:, score_off] = data_frame.score.as_matrix()
+        tmp[:, ambiguity_off] = data_frame.ambiguity.as_matrix()
         tmp[:, -128:] = features
         data.numPts = size
+        data_size = size * sizeof(SiftPoint)
         with nogil:
-            cudaMemcpy(data.d_data, pts, sizeof(SiftPoint)*size, cudaMemcpyDeviceToHost)
+            error = cudaMemcpy(data.d_data, pts, data_size, 
+                                   cudaMemcpyHostToDevice)
+        checkError(error, "during " + ("cudaHostRegister" if state == 0 else "cudaMemcpy"))
         return self
 
 def ExtractKeypoints(np.ndarray srcImage,
@@ -245,3 +275,7 @@ def ExtractKeypoints(np.ndarray srcImage,
     with nogil:
         ExtractSift(pySiftData.data, destImage, numOctaves, initBlur, thresh,
                     lowestScale, subsampling)
+
+def PyMatchSiftData(PySiftData data1, PySiftData data2):
+    with nogil:
+        MatchSiftData(data1.data, data2.data)

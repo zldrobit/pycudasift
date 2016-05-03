@@ -44,7 +44,7 @@ class BuildExt(build_ext):
         self.compiler._compile = self._cuda_compile
         include_dirs = [
             np.get_include(),
-            os.path.dirname(__file__),
+            os.path.dirname(os.path.abspath(__file__)),
             os.path.join(self.cuda_prefix, "include")
         ]
         for extension in self.extensions:
