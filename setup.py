@@ -26,11 +26,13 @@ class BuildExt(build_ext):
     def finalize_options(self):
         build_ext.finalize_options(self)
         if self.cuda_prefix is None:
-            self.cuda_prefix = "/usr/local/cuda"
+            self.cuda_prefix = os.environ.get("CUDA_PREFIX", "/usr/local/cuda")
         if self.cuda_version is None:
-            self.cuda_version = "70"
+            self.cuda_version = os.environ.get("CUDA_VERSION", "70")
         if self.cuda_arch is None:
-            self.cuda_arch = "sm_52"
+            self.cuda_arch = os.environ.get("CUDA_ARCH", "sm_52")
+        if self.cuda_gcc is None and "CUDA_GCC" in os.environ:
+            self.cuda_gcc = os.environ["CUDA_GCC"]
     
     def build_extensions(self):
         self.ensure_finalized()
@@ -95,4 +97,4 @@ setuptools.setup(
     description="Bindings for CudaSift library",
     name="cudasift",
     packages=["cudasift"],
-    version="0.1.0")
+    version="0.1.1")
