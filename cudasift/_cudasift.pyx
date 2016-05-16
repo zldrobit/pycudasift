@@ -248,7 +248,7 @@ def ExtractKeypoints(np.ndarray srcImage,
     '''Extract keypoints from an image
     
     :param img: a Numpy 2d array (probably uint8)
-    :param nKeypoints: maximum # of keypoints to fetch
+    :param pySiftData: a :class: `PySiftData` object in which to store pts
     :param numOctaves: # of octaves to accumulate
     :param initBlur: the initial Gaussian standard deviation
     :param thresh: significance threshold for keypoints
