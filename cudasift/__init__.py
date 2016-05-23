@@ -9,4 +9,4 @@ CVIU, 118, pp. 111-127, January 2014.
 
 from _cudasift import PySiftData, ExtractKeypoints, PyMatchSiftData
 
-all=[PySiftData, ExtractKeypoints, PyMatchSiftData]
+all = [PySiftData, ExtractKeypoints, PyMatchSiftData]

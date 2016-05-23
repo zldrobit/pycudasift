@@ -3,7 +3,9 @@ import numpy as np
 import unittest
 import cudasift
 
+
 class TestExtractKeypoints(unittest.TestCase):
+
     def test_01_01_nothing(self):
         # "How? Nothing will come of nothing.", Lear 1:1
         #
@@ -15,8 +17,8 @@ class TestExtractKeypoints(unittest.TestCase):
         self.assertEqual(len(df), 0)
         self.assertSequenceEqual(keypoints.shape, (0, 128))
         for column in "xpos", "ypos", "scale", "sharpness", "edgeness",\
-            "orientation", "score", "ambiguity", "match", "match_xpos", \
-            "match_ypos", "match_error", "subsampling":
+                "orientation", "score", "ambiguity", "match", "match_xpos", \
+                "match_ypos", "match_error", "subsampling":
             assert column in df.columns
 
     def test_01_02_speak_again(self):
@@ -44,7 +46,7 @@ class TestExtractKeypoints(unittest.TestCase):
             self.assertTrue(df.xpos[idx[i]] > 10 and df.xpos[idx[i]] < 15)
         for i in (1, 3):
             self.assertTrue(df.xpos[idx[i]] > 85 and df.xpos[idx[i]] < 90)
-    
+
     def test_01_03_from_data_frame(self):
         data = cudasift.PySiftData(100)
         img = np.zeros((100, 100), np.uint8)
@@ -65,7 +67,7 @@ class TestExtractKeypoints(unittest.TestCase):
         np.testing.assert_array_equal(df.edgeness, df2.edgeness)
         np.testing.assert_array_equal(df.score, df2.score)
         np.testing.assert_array_equal(df.ambiguity, df2.ambiguity)
-    
+
     def test_01_04_match(self):
         #
         # A 3/4/5 right triangle
@@ -73,7 +75,7 @@ class TestExtractKeypoints(unittest.TestCase):
         img = np.zeros((100, 100), np.uint8)
         img[10:90, 10] = 255
         img[10, 10:70] = 255
-        img[np.arange(90, 9, -1), 
+        img[np.arange(90, 9, -1),
             70 - (np.arange(80, -1, -1) * 3 / 4 + .5).astype(int)] = 255
         data1 = cudasift.PySiftData(100)
         cudasift.ExtractKeypoints(img, data1)
@@ -83,7 +85,6 @@ class TestExtractKeypoints(unittest.TestCase):
         df1, keypoints1 = data1.to_data_frame()
         df2, keypoints2 = data2.to_data_frame()
         pass
-        
-if __name__== "__main__":
+
+if __name__ == "__main__":
     unittest.main()
-    
