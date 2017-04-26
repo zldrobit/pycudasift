@@ -244,7 +244,7 @@ def ExtractKeypoints(np.ndarray srcImage,
                      float initBlur = 0,
                      float thresh = 5,
                      float lowestScale = 0, 
-                     float subsampling = 1.0):
+                     bool upScale = False):
     '''Extract keypoints from an image
     
     :param img: a Numpy 2d array (probably uint8)
@@ -253,7 +253,7 @@ def ExtractKeypoints(np.ndarray srcImage,
     :param initBlur: the initial Gaussian standard deviation
     :param thresh: significance threshold for keypoints
     :param lowestScale:
-    :param subsampling: subsampling in pixels
+    :param upScale: whether to upsacle an image before extraction
     
     returns a pandas data frame of SIFT points and an N x 128 numpy array of
         SIFT features per keypoint
@@ -274,7 +274,7 @@ def ExtractKeypoints(np.ndarray srcImage,
     del tmp
     with nogil:
         ExtractSift(pySiftData.data, destImage, numOctaves, initBlur, thresh,
-                    lowestScale, subsampling)
+                    lowestScale, upScale)
 
 def PyMatchSiftData(PySiftData data1, PySiftData data2):
     with nogil:

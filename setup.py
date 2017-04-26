@@ -10,7 +10,7 @@ from distutils.errors import DistutilsFileError
 
 class BuildExt(build_ext):
     user_options = [ 
-        ("cuda-version=", None, "Version # for CUDA libraries (default = 7.0)"),
+        ("cuda-version=", None, "Version # for CUDA libraries (default = 7.5)"),
         ("cuda-prefix=", None, 
          "Prefix for the CUDA install directory (default = /usr/local/cuda)"),
         ("cuda-gcc=", None, "Version of GCC to use in nvcc (default=gcc)"),
@@ -28,7 +28,7 @@ class BuildExt(build_ext):
         if self.cuda_prefix is None:
             self.cuda_prefix = os.environ.get("CUDA_PREFIX", "/usr/local/cuda")
         if self.cuda_version is None:
-            self.cuda_version = os.environ.get("CUDA_VERSION", "70")
+            self.cuda_version = os.environ.get("CUDA_VERSION", "75")
         if self.cuda_arch is None:
             self.cuda_arch = os.environ.get("CUDA_ARCH", "sm_52")
         if self.cuda_gcc is None and "CUDA_GCC" in os.environ:
@@ -97,4 +97,4 @@ setuptools.setup(
     description="Bindings for CudaSift library",
     name="cudasift",
     packages=["cudasift"],
-    version="0.1.1")
+    version="0.1.2")
