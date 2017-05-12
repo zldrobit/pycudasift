@@ -113,7 +113,8 @@ __global__ void FindMaxCorr(float *corrData, SiftPoint *sift1, SiftPoint *sift2,
   if (tx==6)
     sift1[p1].score = maxScore[ty*16];
   if (tx==7)
-    sift1[p1].ambiguity = maxScor2[ty*16] / (maxScore[ty*16] + 1e-6);
+    // sift1[p1].ambiguity = maxScor2[ty*16] / (maxScore[ty*16] + 1e-6);
+    sift1[p1].ambiguity = (1 - maxScor[ty*16]) / (1 - maxScore2[ty*16] + 1e-6);
   if (tx==8)
     sift1[p1].match = maxIndex[ty*16];
   if (tx==9)
