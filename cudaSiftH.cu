@@ -80,7 +80,9 @@ void ExtractSift(SiftData &siftData, CudaImage &img, int numOctaves, double init
     ExtractSiftLoop(siftData, lowImg, numOctaves, 0.0f, thresh, lowestScale*2.0f, 1.0f, memoryTmp, memorySub + height*iAlignUp(width, 128));
     safeCall(cudaMemcpyFromSymbol(&siftData.numPts, d_PointCounter, sizeof(int)));
     siftData.numPts = (siftData.numPts<siftData.maxPts ? siftData.numPts : siftData.maxPts);
-    RescalePositions(siftData, 0.5f);
+    if (siftData.numPts > 0) {
+      RescalePositions(siftData, 0.5f);
+    }
   }
   
   safeCall(cudaFree(memoryTmp));
